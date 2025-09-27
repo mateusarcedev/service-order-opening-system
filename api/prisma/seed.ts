@@ -1,9 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
 
-
-
-
 const prisma = new PrismaClient()
 
 async function main() {
@@ -17,7 +14,6 @@ async function main() {
       role: 'ADMIN',
     },
   })
-
 
   const template = await prisma.checklistTemplate.upsert({
     where: { id: 'seed-template-1' },
@@ -35,7 +31,6 @@ async function main() {
     },
     include: { items: true },
   })
-
 
   const so = await prisma.serviceOrder.create({
     data: {
