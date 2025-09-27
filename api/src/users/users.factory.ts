@@ -1,4 +1,3 @@
-// src/users/users.factory.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PublicUser, UserEntity } from './entitites/users.entity';
 
