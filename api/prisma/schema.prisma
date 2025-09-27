@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Status {
+  OPEN
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id           String  @id @default(uuid())
+  name         String
+  email        String  @unique
+  passwordHash String
+  role         String?
+
+  serviceOrders ServiceOrder[]
+}
+
+model ServiceOrder {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  status      Status   @default(OPEN)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  photos     ServiceOrderPhoto[]
+  checklists ServiceOrderChecklist[]
+
+  @@index([status, createdAt])
+}
+
+model ChecklistTemplate {
+  id   String @id @default(uuid())
+  name String
+
+  items ChecklistItem[]
+  uses  ServiceOrderChecklist[]
+}
+
+model ChecklistItem {
+  id         String            @id @default(uuid())
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  label    String
+  required Boolean @default(false)
+
+  answers ChecklistAnswer[]
+
+  @@index([templateId])
+}
+
+model ServiceOrderChecklist {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  answers ChecklistAnswer[]
+
+  @@index([serviceOrderId])
+  @@index([templateId])
+}
+
+model ChecklistAnswer {
+  id String @id @default(uuid())
+
+  soChecklistId String
+  checklist     ServiceOrderChecklist @relation(fields: [soChecklistId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  itemId String
+  item   ChecklistItem @relation(fields: [itemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  boolValue Boolean?
+  textValue String?
+  note      String?
+
+  @@unique([soChecklistId, itemId])
+  @@index([soChecklistId])
+  @@index([itemId])
+}
+
+model ServiceOrderPhoto {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  url     String
+  takenAt DateTime @default(now())
+
+  @@index([serviceOrderId])
+}
