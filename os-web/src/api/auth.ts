@@ -1,24 +1,15 @@
-import { useAuthStore } from '@/stores/auth'
-import axios from 'axios'
+import { api } from './client';
 
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
-})
+export type LoginInput = { email: string; password: string }
+export type LoginOutput = { accessToken: string }
+export type MeOutput = { id: string; name: string; email: string; role?: string | null }
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+export async function login(data: LoginInput): Promise<LoginOutput> {
+  const res = await api.post('/auth/login', data)
+  return res.data
+}
 
-api.interceptors.response.use(
-  (r) => r,
-  (error) => {
-    if (error?.response?.status === 401) {
-      const auth = useAuthStore()
-      auth.logout()
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  },
-)
+export async function me(): Promise<MeOutput> {
+  const res = await api.get('/auth/me')
+  return res.data
+}
