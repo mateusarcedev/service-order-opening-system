@@ -1,6 +1,24 @@
-import { api } from './client';
-export type LoginInput = { email: string; password: string };
-export async function login(data: LoginInput) {
-  const res = await api.post('/auth/login', data);
-  return res.data as { accessToken: string };
-}
+import { useAuthStore } from '@/stores/auth'
+import axios from 'axios'
+
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
+})
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+api.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    if (error?.response?.status === 401) {
+      const auth = useAuthStore()
+      auth.logout()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  },
+)

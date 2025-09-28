@@ -5,7 +5,10 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: () => import('@/features/auth/pages/LoginView.vue') },
-    { path: '/', name: 'home', component: () => import('@/features/service-orders/pages/ListView.vue'), meta: { requiresAuth: true } },
+    { path: '/', name: 'os.list', component: () => import('@/features/service-orders/pages/ListView.vue'), meta: { requiresAuth: true } },
+    { path: '/service-orders/new', name: 'os.new', component: () => import('@/features/service-orders/pages/CreateEditView.vue'), meta: { requiresAuth: true } },
+    { path: '/service-orders/:id', name: 'os.detail', component: () => import('@/features/service-orders/pages/DetailView.vue'), meta: { requiresAuth: true } },
+    { path: '/service-orders/:id/edit', name: 'os.edit', component: () => import('@/features/service-orders/pages/CreateEditView.vue'), meta: { requiresAuth: true } },
   ],
 });
 
