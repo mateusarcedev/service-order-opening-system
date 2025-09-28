@@ -13,12 +13,19 @@ enum Status {
   DONE
 }
 
+enum Role {
+  ADMIN
+  MANAGER
+  TECH
+  VIEWER
+}
+
 model User {
-  id           String  @id @default(uuid())
+  id           String @id @default(uuid())
   name         String
-  email        String  @unique
+  email        String @unique
   passwordHash String
-  role         String?
+  role         Role   @default(VIEWER)
 
   serviceOrders ServiceOrder[]
 }

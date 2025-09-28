@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
+import { Role } from '@prisma/client'
 import { PrismaService } from '../infra/prisma/prisma.service'
 import { UserEntity } from './entitites/users.entity'
-
 export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY')
 
 export interface UsersRepository {
@@ -30,7 +30,7 @@ export class UsersPrismaRepository implements UsersRepository {
         name: data.name,
         email: data.email,
         passwordHash: data.passwordHash,
-        role: data.role ?? 'USER',
+        role: (data.role as Role | undefined) ?? Role.VIEWER,
       },
     })
     return this.map(u)
@@ -42,7 +42,7 @@ export class UsersPrismaRepository implements UsersRepository {
       name: u.name,
       email: u.email,
       passwordHash: u.passwordHash,
-      role: u.role ?? 'USER',
+      role: u.role,
     }
   }
 }
