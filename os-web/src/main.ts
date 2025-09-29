@@ -3,6 +3,7 @@ import { router } from '@/app/router'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { createPinia } from 'pinia'
 import { createApp, h } from 'vue'
+import "vue-sonner"
 import App from './App.vue'
 import './styles/style.css'
 

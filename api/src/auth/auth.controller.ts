@@ -15,7 +15,7 @@ import { LoginDto } from './dtos/login.dto'
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly auth: AuthService) { }
 
   @Post('login')
   @ApiOkResponse({
@@ -44,7 +44,6 @@ export class AuthController {
     },
   })
   me(@CurrentUser() user: any) {
-    // user vem do JwtStrategy.validate
     return user
   }
 }

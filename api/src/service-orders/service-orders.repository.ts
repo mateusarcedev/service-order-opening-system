@@ -1,28 +1,29 @@
-import { Injectable } from '@nestjs/common';
-import { Status } from '@prisma/client';
-import { PrismaService } from '../infra/prisma/prisma.service';
-import { ServiceOrderEntity } from './entitites/service-order.entity';
+import { Injectable } from '@nestjs/common'
+import { Status } from '@prisma/client'
+import { PrismaService } from '../infra/prisma/prisma.service'
+import { ServiceOrderEntity } from './entitites/service-order.entity'
+import type { ServiceOrderDetail } from './service-orders.service'
 
-
-export const SERVICE_ORDERS_REPOSITORY = Symbol('SERVICE_ORDERS_REPOSITORY');
+export const SERVICE_ORDERS_REPOSITORY = Symbol('SERVICE_ORDERS_REPOSITORY')
 
 export type ListParams = {
-  status?: Status;
-  q?: string;
-  page: number;
-  limit: number;
-  createdById?: string;
-};
+  status?: Status
+  q?: string
+  page: number
+  limit: number
+  createdById?: string
+}
 
 export interface ServiceOrdersRepository {
-  list(params: ListParams): Promise<{ data: ServiceOrderEntity[]; total: number }>;
-  findById(id: string): Promise<ServiceOrderEntity | null>;
-  create(data: Omit<ServiceOrderEntity, 'id' | 'status' | 'createdAt' | 'updatedAt'>): Promise<ServiceOrderEntity>;
+  list(params: ListParams): Promise<{ data: ServiceOrderEntity[]; total: number }>
+  findById(id: string): Promise<ServiceOrderEntity | null>
+  findDetailById(id: string): Promise<ServiceOrderDetail | null>
+  create(data: Omit<ServiceOrderEntity, 'id' | 'status' | 'createdAt' | 'updatedAt'>): Promise<ServiceOrderEntity>
   update(
     id: string,
     data: Partial<Omit<ServiceOrderEntity, 'id' | 'createdById' | 'createdAt' | 'updatedAt'>>,
-  ): Promise<ServiceOrderEntity>;
-  remove(id: string): Promise<void>;
+  ): Promise<ServiceOrderEntity>
+  remove(id: string): Promise<void>
 }
 
 @Injectable()
@@ -30,15 +31,15 @@ export class PrismaServiceOrdersRepository implements ServiceOrdersRepository {
   constructor(private readonly prisma: PrismaService) { }
 
   async list(params: ListParams) {
-    const { page, limit, q, status, createdById } = params;
-    const where: any = {};
-    if (status) where.status = status;
-    if (createdById) where.createdById = createdById;
+    const { page, limit, q, status, createdById } = params
+    const where: any = {}
+    if (status) where.status = status
+    if (createdById) where.createdById = createdById
     if (q) {
       where.OR = [
         { title: { contains: q, mode: 'insensitive' } },
         { description: { contains: q, mode: 'insensitive' } },
-      ];
+      ]
     }
 
     const [total, rows] = await this.prisma.$transaction([
@@ -49,14 +50,56 @@ export class PrismaServiceOrdersRepository implements ServiceOrdersRepository {
         skip: (page - 1) * limit,
         take: limit,
       }),
-    ]);
+    ])
 
-    return { total, data: rows.map(this.map) };
+    return { total, data: rows.map(this.map) }
   }
 
   async findById(id: string) {
-    const so = await this.prisma.serviceOrder.findUnique({ where: { id } });
-    return so ? this.map(so) : null;
+    const so = await this.prisma.serviceOrder.findUnique({ where: { id } })
+    return so ? this.map(so) : null
+  }
+
+  async findDetailById(id: string): Promise<ServiceOrderDetail | null> {
+    const so = await this.prisma.serviceOrder.findUnique({ where: { id } })
+    if (!so) return null
+
+    const inst = await this.prisma.serviceOrderChecklist.findFirst({
+      where: { serviceOrderId: id },
+      include: {
+        template: { include: { items: { orderBy: { label: 'asc' } } } },
+        answers: true,
+      },
+    })
+
+    const checklist =
+      inst && inst.template
+        ? {
+          id: inst.id,
+          startedAt: inst.startedAt,
+          finishedAt: inst.finishedAt,
+          template: {
+            id: inst.template.id,
+            name: inst.template.name,
+            items: inst.template.items.map((i) => ({
+              id: i.id,
+              label: i.label,
+              required: i.required,
+            })),
+          },
+          answers: (inst.answers ?? []).map((a) => ({
+            itemId: a.itemId,
+            boolValue: a.boolValue,
+            textValue: a.textValue,
+            note: a.note,
+          })),
+        }
+        : null
+
+    return {
+      ...this.map(so),
+      checklist,
+    }
   }
 
   async create(data: Omit<ServiceOrderEntity, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
@@ -67,8 +110,8 @@ export class PrismaServiceOrdersRepository implements ServiceOrdersRepository {
         status: 'OPEN',
         createdById: data.createdById,
       },
-    });
-    return this.map(so);
+    })
+    return this.map(so)
   }
 
   async update(
@@ -82,12 +125,12 @@ export class PrismaServiceOrdersRepository implements ServiceOrdersRepository {
         description: data.description,
         status: data.status ?? undefined,
       },
-    });
-    return this.map(so);
+    })
+    return this.map(so)
   }
 
   async remove(id: string) {
-    await this.prisma.serviceOrder.delete({ where: { id } });
+    await this.prisma.serviceOrder.delete({ where: { id } })
   }
 
   private map = (r: any): ServiceOrderEntity => ({
@@ -98,5 +141,5 @@ export class PrismaServiceOrdersRepository implements ServiceOrdersRepository {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     createdById: r.createdById,
-  });
+  })
 }

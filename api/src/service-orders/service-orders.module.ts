@@ -6,9 +6,10 @@ import {
   SERVICE_ORDERS_REPOSITORY,
 } from './service-orders.repository';
 import { ServiceOrdersService } from './service-orders.service';
+import { ChecklistModule } from 'src/checklist/checklist.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ChecklistModule],
   controllers: [ServiceOrdersController],
   providers: [
     ServiceOrdersService,

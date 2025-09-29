@@ -1,11 +1,11 @@
-import type { Status } from '@prisma/client';
+import { Status } from '@prisma/client'
 
 export type ServiceOrderEntity = {
-  id?: string;
-  title: string;
-  description: string;
-  status: Status;
-  createdAt?: Date;
-  updatedAt?: Date;
-  createdById: string;
-};
+  id: string
+  title: string
+  description: string
+  status: Status
+  createdById: string
+  createdAt: Date
+  updatedAt: Date
+}

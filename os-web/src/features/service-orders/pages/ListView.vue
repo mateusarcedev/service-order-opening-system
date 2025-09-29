@@ -4,12 +4,11 @@ import {
   type ServiceOrder,
   type Status,
 } from '@/api/service-orders'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQuery } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const qc = useQueryClient()
 
 const q = ref('')
 const uiStatus = ref<'ALL' | Status>('ALL')
@@ -35,9 +34,7 @@ const query = useQuery({
 
 const rows = computed<ServiceOrder[]>(() => query.data?.value?.data ?? [])
 const total = computed<number>(() => query.data?.value?.total ?? 0)
-const hasEmpty = computed(
-  () => !query.isLoading.value && rows.value.length === 0,
-)
+const hasEmpty = computed(() => !query.isLoading.value && rows.value.length === 0)
 const errorMsg = computed(
   () =>
     (query.error?.value as any)?.response?.data?.message ||
@@ -50,15 +47,12 @@ function aplicar() {
   query.refetch()
 }
 
-
 function goDetail(id: string) {
-  // Detalhes = abre tab de resumo
   router.push({ name: 'os.detail', params: { id }, query: { tab: 'summary' } })
 }
 
 function goAttend(id: string) {
-  // Atender = abre tab de checklist
-  router.push({ name: 'os.detail', params: { id }, query: { tab: 'checklist' } })
+  router.push({ name: 'os.attend', params: { id } })
 }
 
 function goNew() {
@@ -69,7 +63,6 @@ function goEdit(id: string) {
   router.push({ name: 'os.edit', params: { id } })
 }
 
-// badge por status
 function badgeClass(s: Status) {
   switch (s) {
     case 'OPEN':
@@ -90,30 +83,19 @@ function badgeClass(s: Status) {
       <div class="flex items-center justify-between mb-3">
         <div>
           <h2 class="text-lg font-semibold">Ordens de Serviço</h2>
-          <p class="text-sm text-muted-foreground">
-            Filtre por status e busca textual.
-          </p>
+          <p class="text-sm text-muted-foreground">Filtre por status e busca textual.</p>
         </div>
-        <button class="px-3 py-2 rounded-md bg-black text-white" @click="goNew">
-          Nova OS
-        </button>
+        <button class="px-3 py-2 rounded-md bg-black text-white" @click="goNew">Nova OS</button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-4">
         <div>
           <label class="text-sm font-medium">Buscar</label>
-          <input
-            class="mt-1 w-full border rounded-md px-3 py-2"
-            placeholder="título/descrição"
-            v-model="q"
-          />
+          <input class="mt-1 w-full border rounded-md px-3 py-2" placeholder="título/descrição" v-model="q" />
         </div>
         <div>
           <label class="text-sm font-medium">Status</label>
-          <select
-            class="mt-1 w-full border rounded-md px-3 py-2"
-            v-model="uiStatus"
-          >
+          <select class="mt-1 w-full border rounded-md px-3 py-2" v-model="uiStatus">
             <option value="ALL">Todos</option>
             <option value="OPEN">OPEN</option>
             <option value="IN_PROGRESS">IN_PROGRESS</option>
@@ -122,29 +104,20 @@ function badgeClass(s: Status) {
         </div>
         <div>
           <label class="text-sm font-medium">Por página</label>
-          <select
-            class="mt-1 w-full border rounded-md px-3 py-2"
-            v-model.number="limit"
-          >
+          <select class="mt-1 w-full border rounded-md px-3 py-2" v-model.number="limit">
             <option :value="10">10</option>
             <option :value="20">20</option>
             <option :value="50">50</option>
           </select>
         </div>
         <div class="md:justify-self-start">
-          <button class="px-4 py-2 rounded-md bg-black text-white" @click="aplicar">
-            Aplicar
-          </button>
+          <button class="px-4 py-2 rounded-md bg-black text-white" @click="aplicar">Aplicar</button>
         </div>
       </div>
 
-      <p v-if="query.isError.value" class="text-red-600 text-sm mb-2">
-        {{ errorMsg }}
-      </p>
+      <p v-if="query.isError.value" class="text-red-600 text-sm mb-2">{{ errorMsg }}</p>
       <p v-else-if="query.isLoading.value">Carregando…</p>
-      <p v-else-if="hasEmpty" class="text-sm text-muted-foreground">
-        Nenhum registro.
-      </p>
+      <p v-else-if="hasEmpty" class="text-sm text-muted-foreground">Nenhum registro.</p>
 
       <table v-else class="w-full text-sm">
         <thead>
@@ -152,44 +125,38 @@ function badgeClass(s: Status) {
             <th class="py-2">Título</th>
             <th class="py-2">Status</th>
             <th class="py-2">Criada em</th>
-            <th class="py-2 w-56"></th>
+            <th class="py-2 w-48"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id" class="border-b">
             <td class="py-2">
-              <!-- Título agora NÃO é link -->
               <span class="text-gray-800">{{ row.title }}</span>
             </td>
             <td class="py-2">
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
-                :class="badgeClass(row.status)"
-              >
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium" :class="badgeClass(row.status)">
                 {{ row.status }}
               </span>
             </td>
-            <td class="py-2">
-              {{ new Date(row.createdAt).toLocaleString() }}
-            </td>
+            <td class="py-2">{{ new Date(row.createdAt).toLocaleString() }}</td>
             <td class="py-2">
               <div class="flex gap-2">
-                <button class="px-3 py-1 rounded border" @click="goEdit(row.id)">
-                  Editar
-                </button>
+                <button class="px-3 py-1 rounded border" @click="goEdit(row.id)">Editar</button>
+
                 <button
+                  v-if="row.status !== 'DONE'"
+                  class="px-3 py-1 rounded border"
+                  @click="goAttend(row.id)"
+                >
+                  Atender
+                </button>
+
+                <button
+                  v-else
                   class="px-3 py-1 rounded border"
                   @click="goDetail(row.id)"
                 >
                   Detalhes
-                </button>
-                <button
-                  class="px-3 py-1 rounded border"
-                  :class="row.status === 'DONE' ? 'opacity-50 cursor-not-allowed' : ''"
-                  :disabled="row.status === 'DONE'"
-                  @click="goAttend(row.id)"
-                >
-                  {{ row.status === 'DONE' ? 'Concluída' : 'Atender' }}
                 </button>
               </div>
             </td>
@@ -198,17 +165,9 @@ function badgeClass(s: Status) {
       </table>
 
       <div v-if="!hasEmpty" class="mt-3 flex items-center gap-2">
-        <button class="px-3 py-1 rounded border" :disabled="page <= 1" @click="page--">
-          Anterior
-        </button>
+        <button class="px-3 py-1 rounded border" :disabled="page <= 1" @click="page--">Anterior</button>
         <span>Página {{ page }}</span>
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="rows.length < limit"
-          @click="page++"
-        >
-          Próxima
-        </button>
+        <button class="px-3 py-1 rounded border" :disabled="rows.length < limit" @click="page++">Próxima</button>
         <span class="ml-auto text-xs text-muted-foreground">Total: {{ total }}</span>
       </div>
     </div>

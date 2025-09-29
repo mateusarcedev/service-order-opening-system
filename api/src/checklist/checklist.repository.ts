@@ -10,22 +10,23 @@ import type {
 export const CHECKLIST_REPOSITORY = Symbol('CHECKLIST_REPOSITORY');
 
 export interface ChecklistRepository {
-  // templates
   listTemplates(): Promise<ChecklistTemplateEntity[]>;
   getTemplateItems(templateId: string): Promise<ChecklistItemEntity[]>;
-
-  // checklist instance
+  createTemplateWithItems(input: {
+    name: string;
+    items: { label: string; required: boolean }[];
+  }): Promise<ChecklistTemplateEntity & { items: ChecklistItemEntity[] }>;
   getChecklistByServiceOrder(serviceOrderId: string): Promise<ServiceOrderChecklistEntity | null>;
+  getChecklistDetailForSO(serviceOrderId: string): Promise<{
+    template: { name: string; items: Array<{ id: string; label: string; required: boolean }> } | null;
+    answers: Array<{ itemId: string; boolValue: boolean | null; textValue: string | null; note: string | null }>;
+  } | null>;
   startChecklist(serviceOrderId: string, templateId: string): Promise<ServiceOrderChecklistEntity>;
   finishChecklist(checklistId: string): Promise<ServiceOrderChecklistEntity>;
-
-  // answers
   upsertAnswers(
     checklistId: string,
     inputs: Array<{ itemId: string; boolValue?: boolean | null; textValue?: string | null; note?: string | null }>,
   ): Promise<ChecklistAnswerEntity[]>;
-
-  // helpers
   countRequiredItems(templateId: string): Promise<number>;
   countRequiredAnswered(checklistId: string): Promise<number>;
   getServiceOrderCreator(serviceOrderId: string): Promise<{ createdById: string } | null>;
@@ -53,30 +54,56 @@ export class PrismaChecklistRepository implements ChecklistRepository {
     }));
   }
 
+  async createTemplateWithItems(input: { name: string; items: { label: string; required: boolean }[] }) {
+    const t = await this.prisma.checklistTemplate.create({
+      data: {
+        name: input.name,
+        items: { create: input.items.map((i) => ({ label: i.label, required: i.required })) },
+      },
+      include: { items: true },
+    });
+    return {
+      id: t.id,
+      name: t.name,
+      items: t.items.map((i) => ({ id: i.id, templateId: i.templateId, label: i.label, required: i.required })),
+    };
+  }
+
   async getChecklistByServiceOrder(serviceOrderId: string) {
     const c = await this.prisma.serviceOrderChecklist.findFirst({ where: { serviceOrderId } });
     return c
-      ? {
-        id: c.id,
-        serviceOrderId: c.serviceOrderId,
-        templateId: c.templateId,
-        startedAt: c.startedAt,
-        finishedAt: c.finishedAt,
-      }
+      ? { id: c.id, serviceOrderId: c.serviceOrderId, templateId: c.templateId, startedAt: c.startedAt, finishedAt: c.finishedAt }
       : null;
   }
 
-  async startChecklist(serviceOrderId: string, templateId: string) {
-    const c = await this.prisma.serviceOrderChecklist.create({
-      data: { serviceOrderId, templateId },
+  async getChecklistDetailForSO(serviceOrderId: string) {
+    const inst = await this.prisma.serviceOrderChecklist.findFirst({
+      where: { serviceOrderId },
+      include: {
+        template: { include: { items: { orderBy: { label: 'asc' } } } },
+        answers: true,
+      },
     });
+    if (!inst) return null;
     return {
-      id: c.id,
-      serviceOrderId: c.serviceOrderId,
-      templateId: c.templateId,
-      startedAt: c.startedAt,
-      finishedAt: c.finishedAt,
+      template: inst.template
+        ? {
+          name: inst.template.name,
+          items: inst.template.items.map((i) => ({ id: i.id, label: i.label, required: i.required })),
+        }
+        : null,
+      answers: (inst.answers ?? []).map((a) => ({
+        itemId: a.itemId,
+        boolValue: a.boolValue,
+        textValue: a.textValue,
+        note: a.note,
+      })),
     };
+  }
+
+  async startChecklist(serviceOrderId: string, templateId: string) {
+    const c = await this.prisma.serviceOrderChecklist.create({ data: { serviceOrderId, templateId } });
+    return { id: c.id, serviceOrderId: c.serviceOrderId, templateId: c.templateId, startedAt: c.startedAt, finishedAt: c.finishedAt };
   }
 
   async finishChecklist(checklistId: string) {
@@ -84,16 +111,13 @@ export class PrismaChecklistRepository implements ChecklistRepository {
       where: { id: checklistId },
       data: { finishedAt: new Date() },
     });
-    return {
-      id: c.id,
-      serviceOrderId: c.serviceOrderId,
-      templateId: c.templateId,
-      startedAt: c.startedAt,
-      finishedAt: c.finishedAt,
-    };
+    return { id: c.id, serviceOrderId: c.serviceOrderId, templateId: c.templateId, startedAt: c.startedAt, finishedAt: c.finishedAt };
   }
 
-  async upsertAnswers(checklistId: string, inputs: Array<{ itemId: string; boolValue?: boolean | null; textValue?: string | null; note?: string | null }>) {
+  async upsertAnswers(
+    checklistId: string,
+    inputs: Array<{ itemId: string; boolValue?: boolean | null; textValue?: string | null; note?: string | null }>,
+  ) {
     const ops = inputs.map((a) =>
       this.prisma.checklistAnswer.upsert({
         where: { soChecklistId_itemId: { soChecklistId: checklistId, itemId: a.itemId } },
@@ -102,14 +126,7 @@ export class PrismaChecklistRepository implements ChecklistRepository {
       }),
     );
     const rows = await this.prisma.$transaction(ops);
-    return rows.map((r) => ({
-      id: r.id,
-      soChecklistId: r.soChecklistId,
-      itemId: r.itemId,
-      boolValue: r.boolValue,
-      textValue: r.textValue,
-      note: r.note,
-    }));
+    return rows.map((r) => ({ id: r.id, soChecklistId: r.soChecklistId, itemId: r.itemId, boolValue: r.boolValue, textValue: r.textValue, note: r.note }));
   }
 
   async countRequiredItems(templateId: string) {
@@ -117,24 +134,17 @@ export class PrismaChecklistRepository implements ChecklistRepository {
   }
 
   async countRequiredAnswered(checklistId: string) {
-    // conta respostas para itens required
     return this.prisma.checklistAnswer.count({
       where: {
         soChecklistId: checklistId,
         item: { required: true },
-        OR: [
-          { boolValue: true },
-          { textValue: { not: null } }, // se usar texto como resposta
-        ],
+        OR: [{ boolValue: true }, { textValue: { not: null } }],
       },
     });
   }
 
   async getServiceOrderCreator(serviceOrderId: string) {
-    const so = await this.prisma.serviceOrder.findUnique({
-      where: { id: serviceOrderId },
-      select: { createdById: true },
-    });
+    const so = await this.prisma.serviceOrder.findUnique({ where: { id: serviceOrderId }, select: { createdById: true } });
     return so ?? null;
   }
 }
