@@ -1,4 +1,3 @@
-// src/users/users.service.ts
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { CreateUserDto } from './dtos/create-user.dto';

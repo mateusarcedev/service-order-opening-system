@@ -22,13 +22,11 @@ import { StartChecklistDto } from './dtos/start-checklist.dto'
 export class ChecklistController {
   constructor(private readonly service: ChecklistService) { }
 
-  // Opcional: lista templates
   @Get('templates')
   async listTemplates() {
     return this.service.listTemplates()
   }
 
-  // Opcional: iniciar checklist (se precisar iniciar manualmente)
   @Post('service-orders/:id/start')
   async startChecklist(
     @Param('id') serviceOrderId: string,
@@ -41,13 +39,11 @@ export class ChecklistController {
     })
   }
 
-  // Detalhe do checklist da OS (template + itens + respostas)
   @Get('service-orders/:id')
   async getDetail(@Param('id') serviceOrderId: string) {
     return this.service.getDetailForSO(serviceOrderId)
   }
 
-  // Salvar/atualizar respostas
   @Patch('service-orders/:id/answers')
   @ApiOkResponse({
     schema: {
@@ -74,7 +70,6 @@ export class ChecklistController {
     })
   }
 
-  // Finalizar checklist (sem body)
   @Post('service-orders/:id/finish')
   async finish(@Param('id') serviceOrderId: string, @CurrentUser() user: any) {
     return this.service.finishChecklist(serviceOrderId, {
