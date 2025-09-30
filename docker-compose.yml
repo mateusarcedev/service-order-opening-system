@@ -1,0 +1,72 @@
+services:
+  os_system:
+    image: postgres:13.5
+    container_name: os_system
+    restart: unless-stopped
+    env_file:
+      - ./api/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./api/.env
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console
+    volumes:
+      - minio_data:/data
+    networks:
+      - app_network
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: os_api
+    restart: unless-stopped
+    depends_on:
+      os_system:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    env_file:
+      - ./api/.env
+    ports:
+      - "3000:3000"
+    networks:
+      - app_network
+
+  web:
+    build:
+      context: ./os-web
+      dockerfile: Dockerfile
+    container_name: os_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+
+networks:
+  app_network:
+    driver: bridge

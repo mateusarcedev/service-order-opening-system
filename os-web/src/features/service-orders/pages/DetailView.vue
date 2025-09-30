@@ -23,7 +23,12 @@ type ChecklistDetail = {
     name: string
     items: Array<{ id: string; label: string; required: boolean }>
   }
-  answers: Array<{ itemId: string; boolValue: boolean | null; textValue: string | null; note: string | null }>
+  answers: Array<{
+    itemId: string
+    boolValue: boolean | null
+    textValue: string | null
+    note: string | null
+  }>
 }
 type ServiceOrderDetail = ServiceOrderBase & { checklist: ChecklistDetail | null }
 
@@ -38,22 +43,28 @@ async function fetchSO(soId: string): Promise<ServiceOrderDetail> {
   const { data } = await api.get(`/service-orders/${soId}`)
   return data
 }
-
 async function listPhotosRaw(soId: string): Promise<PhotoFromList[]> {
   const { data } = await api.get(`/service-orders/${soId}/photos`)
   return (data ?? []) as PhotoFromList[]
 }
-
 async function fetchPhotoBlob(soId: string, pid: string): Promise<string> {
-  const { data } = await api.get(`/service-orders/${soId}/photos/${pid}`, { responseType: 'blob' })
+  const { data } = await api.get(`/service-orders/${soId}/photos/${pid}`, {
+    responseType: 'blob',
+  })
   return URL.createObjectURL(data)
 }
 
+
 const gallery = ref<Photo[]>([])
 const objectUrls = new Set<string>()
-function rememberUrl(u: string) { objectUrls.add(u); return u }
-function revokeAll() { for (const u of objectUrls) URL.revokeObjectURL(u); objectUrls.clear() }
-
+function rememberUrl(u: string) {
+  objectUrls.add(u)
+  return u
+}
+function revokeAll() {
+  for (const u of objectUrls) URL.revokeObjectURL(u)
+  objectUrls.clear()
+}
 async function loadPhotos() {
   try {
     const items = await listPhotosRaw(id)
@@ -69,7 +80,7 @@ async function loadPhotos() {
         }
       }),
     )
-    gallery.value = photos.filter(p => !!p.url)
+    gallery.value = photos.filter((p) => !!p.url)
   } catch {
     gallery.value = []
   }
@@ -80,13 +91,15 @@ const so = useQuery({
   queryFn: () => fetchSO(id),
 })
 
+
 watch(
   () => so.isSuccess.value,
   (ok) => {
     if (ok) loadPhotos()
   },
-  { immediate: true }
+  { immediate: true },
 )
+
 
 const badge = computed(() => {
   const s = so.data?.value?.status
@@ -110,22 +123,33 @@ const duration = computed(() => {
   return h > 0 ? `${h}h ${m}min` : `${m}min`
 })
 
+
 onBeforeUnmount(() => revokeAll())
-function goBack() { router.back() }
+
+function goBack() {
+  router.back()
+}
 </script>
 
 <template>
   <div class="p-6 space-y-6">
     <div class="flex items-center justify-between">
       <h1 class="text-xl font-semibold">Detalhes da OS</h1>
-      <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium" :class="badge">
+      <span
+        class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
+        :class="badge"
+      >
         {{ so.data?.value?.status }}
       </span>
     </div>
 
     <div class="rounded-xl border p-4">
-      <h2 class="text-lg font-semibold mb-1">{{ so.data?.value?.title }}</h2>
-      <p class="text-sm text-muted-foreground">{{ so.data?.value?.description }}</p>
+      <h2 class="text-lg font-semibold mb-1">
+        {{ so.data?.value?.title }}
+      </h2>
+      <p class="text-sm text-muted-foreground">
+        {{ so.data?.value?.description }}
+      </p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -133,12 +157,17 @@ function goBack() { router.back() }
         <div class="rounded-xl border p-4">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold">Checklist</h3>
-            <div class="text-xs text-muted-foreground" v-if="!so.data?.value?.checklist">Sem checklist.</div>
+            <div class="text-xs text-muted-foreground" v-if="!so.data?.value?.checklist">
+              Sem checklist.
+            </div>
           </div>
 
           <template v-if="so.data?.value?.checklist">
             <div class="text-sm text-muted-foreground mb-3">
-              Template: <span class="font-medium">{{ so.data?.value?.checklist?.template.name }}</span>
+              Template:
+              <span class="font-medium">
+                {{ so.data?.value?.checklist?.template.name }}
+              </span>
             </div>
 
             <div class="space-y-2">
@@ -150,7 +179,11 @@ function goBack() { router.back() }
                 <div class="flex items-center gap-2">
                   <div
                     class="h-4 w-4 rounded-sm border flex items-center justify-center"
-                    :class="(so.data?.value?.checklist?.answers?.some(a => a.itemId === it.id && a.boolValue)) ? 'bg-green-600 border-green-600' : 'bg-gray-100 border-gray-300'"
+                    :class="
+                      (so.data?.value?.checklist?.answers?.some(a => a.itemId === it.id && a.boolValue))
+                        ? 'bg-green-600 border-green-600'
+                        : 'bg-gray-100 border-gray-300'
+                    "
                   >
                     <span class="text-[10px] text-white">✓</span>
                   </div>
@@ -159,6 +192,7 @@ function goBack() { router.back() }
                     <span v-if="it.required" class="text-red-600 text-xs">*</span>
                   </div>
                 </div>
+
                 <div
                   class="text-xs text-muted-foreground mt-1"
                   v-if="so.data?.value?.checklist?.answers?.find(a => a.itemId === it.id)?.note"
@@ -171,12 +205,26 @@ function goBack() { router.back() }
         </div>
 
         <div class="rounded-xl border p-4">
-          <h3 class="font-semibold mb-3">Fotos do atendimento</h3>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">Fotos do atendimento</h3>
+            <button
+              class="text-xs px-2 py-1 rounded border"
+              @click="loadPhotos"
+              title="Recarregar fotos"
+            >
+              Recarregar
+            </button>
+          </div>
+
           <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div v-for="p in gallery" :key="p.id" class="rounded-lg overflow-hidden border">
               <img :src="p.url" alt="" class="w-full h-32 object-cover" />
             </div>
-            <div v-if="gallery.length === 0" class="text-sm text-muted-foreground">
+
+            <div
+              v-if="gallery.length === 0"
+              class="text-sm text-muted-foreground col-span-full"
+            >
               Nenhuma foto disponível.
             </div>
           </div>
