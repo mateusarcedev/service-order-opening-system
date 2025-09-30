@@ -140,26 +140,30 @@ function badgeClass(s: Status) {
             </td>
             <td class="py-2">{{ new Date(row.createdAt).toLocaleString() }}</td>
             <td class="py-2">
-              <div class="flex gap-2">
-                <button class="px-3 py-1 rounded border" @click="goEdit(row.id)">Editar</button>
+  <div class="flex gap-2">
+    <button
+      v-if="row.status !== 'DONE'"
+      class="px-3 py-1 rounded border"
+      @click="goEdit(row.id)"
+    >
+      Editar
+    </button>
 
-                <button
-                  v-if="row.status !== 'DONE'"
-                  class="px-3 py-1 rounded border"
-                  @click="goAttend(row.id)"
-                >
-                  Atender
-                </button>
+    <button class="px-3 py-1 rounded border" @click="goDetail(row.id)">
+      Detalhes
+    </button>
 
-                <button
-                  v-else
-                  class="px-3 py-1 rounded border"
-                  @click="goDetail(row.id)"
-                >
-                  Detalhes
-                </button>
-              </div>
-            </td>
+    <button
+      class="px-3 py-1 rounded border"
+      :class="row.status === 'DONE' ? 'opacity-50 cursor-not-allowed' : ''"
+      :disabled="row.status === 'DONE'"
+      @click="goAttend(row.id)"
+    >
+      {{ row.status === 'DONE' ? 'Concluída' : 'Atender' }}
+    </button>
+  </div>
+</td>
+
           </tr>
         </tbody>
       </table>

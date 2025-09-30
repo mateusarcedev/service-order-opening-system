@@ -1,4 +1,3 @@
-// src/app/router.ts
 import { useAuthStore } from '@/stores/auth'
 import { createRouter, createWebHistory } from 'vue-router'
 
@@ -11,6 +10,7 @@ export const router = createRouter({
     { path: '/service-orders/:id', name: 'os.detail', component: () => import('@/features/service-orders/pages/DetailView.vue'), meta: { requiresAuth: true } },
     { path: '/service-orders/:id/edit', name: 'os.edit', component: () => import('@/features/service-orders/pages/CreateEditView.vue'), meta: { requiresAuth: true } },
     { path: '/service-orders/:id/attend', name: 'os.attend', component: () => import('@/features/service-orders/pages/AttendView.vue'), meta: { requiresAuth: true } },
+    { path: '/signup', name: 'signup', component: () => import('@/features/auth/pages/SignupView.vue'), meta: { public: true }, }
   ],
 })
 

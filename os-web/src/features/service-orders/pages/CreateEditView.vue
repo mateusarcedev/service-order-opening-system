@@ -1,161 +1,219 @@
 <script setup lang="ts">
 import { api } from '@/api/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ref, reactive, computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 type Template = { id: string; name: string }
-type ListTplResp = Template[]
-type CreatePayload =
-  | { title: string; description?: string; templateId: string }
-  | { title: string; description?: string; newChecklist: { name: string; items: { label: string; required?: boolean }[] } }
 
 const router = useRouter()
 const qc = useQueryClient()
 
-const title = ref('')
-const description = ref('')
-
-const mode = ref<'existing' | 'new'>('existing')
-const selectedTemplateId = ref<string>('')
-
-const newChecklist = reactive({
-  name: '',
-  items: [{ label: '', required: true }] as { label: string; required: boolean }[],
+const form = reactive({
+  title: '',
+  description: '',
+  mode: 'existing' as 'existing' | 'new',
+  templateId: '' as string,
+  newChecklistName: '',
+  items: [] as Array<{ id: string; label: string; required: boolean }>,
 })
 
-const qTemplates = useQuery({
+const isValidTitle = computed(() => form.title.trim().length >= 3)
+const isValidTemplateExisting = computed(() => form.mode === 'existing' ? !!form.templateId : true)
+const isValidTemplateNew = computed(() =>
+  form.mode === 'new' ? form.newChecklistName.trim().length >= 3 && form.items.length > 0 && form.items.every(i => i.label.trim().length > 0) : true,
+)
+const canSubmit = computed(() => isValidTitle.value && isValidTemplateExisting.value && isValidTemplateNew.value)
+
+const tplQuery = useQuery({
   queryKey: ['checklist-templates'],
-  queryFn: async () => (await api.get<ListTplResp>('/checklist-templates')).data,
-})
-
-const canSubmit = computed(() => {
-  if (!title.value.trim()) return false
-  if (mode.value === 'existing') return !!selectedTemplateId.value
-  if (!newChecklist.name.trim()) return false
-  if (newChecklist.items.length === 0) return false
-  return newChecklist.items.every(i => i.label.trim().length > 0)
+  queryFn: async (): Promise<Template[]> => {
+    const { data } = await api.get('/checklist/templates')
+    return data ?? []
+  },
+  staleTime: 60_000,
 })
 
 function addItem() {
-  newChecklist.items.push({ label: '', required: false })
+  form.items.push({ id: crypto.randomUUID(), label: '', required: false })
 }
 function removeItem(idx: number) {
-  newChecklist.items.splice(idx, 1)
+  form.items.splice(idx, 1)
 }
 
-const mCreate = useMutation({
-  mutationFn: async (payload: CreatePayload) => (await api.post('/service-orders', payload)).data,
-  onSuccess: async () => {
-    toast.success('OS criada')
-    await qc.invalidateQueries({ queryKey: ['service-orders'] })
-    router.replace({ name: 'os.list' })
+const createMut = useMutation({
+  mutationFn: async () => {
+    const payload: any = {
+      title: form.title.trim(),
+      description: form.description?.trim() || '',
+    }
+    if (form.mode === 'existing') {
+      payload.templateId = form.templateId
+    } else {
+      payload.newChecklist = {
+        name: form.newChecklistName.trim(),
+        items: form.items.map(i => ({ label: i.label.trim(), required: !!i.required })),
+      }
+    }
+    const { data } = await api.post('/service-orders', payload)
+    return data
   },
-  onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Falha ao criar OS'),
+  onSuccess: (so) => {
+    toast.success('Ordem de Serviço criada!')
+    qc.invalidateQueries({ queryKey: ['service-orders'] })
+    router.push({ name: 'os.list', params: { id: so.id } })
+  },
+  onError: (e: any) => {
+    const msg = e?.response?.data?.message || e?.message || 'Falha ao criar OS'
+    toast.error(msg)
+  },
 })
 
-function submit() {
-  if (!canSubmit.value) return
-  const base = {
-    title: title.value.trim(),
-    description: description.value?.trim() || undefined,
-  }
-
-  const payload: CreatePayload =
-    mode.value === 'existing'
-      ? { ...base, templateId: selectedTemplateId.value }
-      : {
-          ...base,
-          newChecklist: {
-            name: newChecklist.name.trim(),
-            items: newChecklist.items.map(i => ({ label: i.label.trim(), required: !!i.required })),
-          },
-        }
-
-  mCreate.mutate(payload)
-}
 </script>
 
 <template>
   <div class="p-6">
-    <div class="max-w-3xl rounded-xl border p-4">
-      <h1 class="text-lg font-semibold mb-4">Nova OS</h1>
-
-      <div class="space-y-3">
-        <div>
-          <label class="text-sm font-medium">Título</label>
-          <input class="mt-1 w-full border rounded-md px-3 py-2" placeholder="Ex.: Instalação inicial" v-model="title" />
-        </div>
-
-        <div>
-          <label class="text-sm font-medium">Descrição</label>
-          <textarea class="mt-1 w-full border rounded-md px-3 py-2 min-h-[120px]" placeholder="Detalhes..." v-model="description" />
-        </div>
-
-        <div class="pt-2">
-          <div class="flex gap-4">
-            <label class="flex items-center gap-2">
-              <input type="radio" value="existing" v-model="mode" />
-              <span class="text-sm">Usar checklist existente</span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="radio" value="new" v-model="mode" />
-              <span class="text-sm">Criar novo checklist</span>
-            </label>
+    <div class="max-w-4xl mx-auto">
+      <div class="rounded-2xl overflow-hidden shadow-sm border bg-white">
+        <div class="text-black px-6 py-5">
+          <div class="flex items-center gap-3">
+            <div class="h-7 w-7 rounded-lg bg-white/15 flex items-center justify-center">✓</div>
+            <div>
+              <h1 class="text-xl font-semibold">Nova Ordem de Serviço</h1>
+              <p class="text-white/80 text-sm">Preencha os detalhes da nova OS</p>
+            </div>
           </div>
         </div>
 
-        <!-- Existing -->
-        <div v-if="mode === 'existing'" class="space-y-2">
-          <label class="text-sm font-medium">Checklist</label>
-          <select class="mt-1 w-full border rounded-md px-3 py-2" v-model="selectedTemplateId">
-            <option value="" disabled>Selecione...</option>
-            <option v-for="t in qTemplates.data?.value ?? []" :key="t.id" :value="t.id">
-              {{ t.name }}
-            </option>
-          </select>
-          <p v-if="qTemplates.isLoading.value" class="text-xs text-muted-foreground">Carregando templates…</p>
-          <p v-else-if="(qTemplates.data?.value?.length ?? 0) === 0" class="text-xs text-muted-foreground">
-            Nenhum template cadastrado.
-          </p>
-        </div>
-
-        <!-- New -->
-        <div v-else class="space-y-3">
+        <div class="p-6 space-y-6">
           <div>
-            <label class="text-sm font-medium">Nome do checklist</label>
-            <input class="mt-1 w-full border rounded-md px-3 py-2" placeholder="Ex.: Checklist de Instalação"
-              v-model="newChecklist.name" />
+            <label class="text-sm font-medium">Título *</label>
+            <input
+              v-model.trim="form.title"
+              class="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ex.: Instalação inicial"
+            />
+            <p v-if="!isValidTitle" class="text-xs text-red-600 mt-1">Informe pelo menos 3 caracteres.</p>
           </div>
 
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="text-sm font-medium">Itens</label>
-              <button class="px-2 py-1 rounded-md border text-xs" @click="addItem">Adicionar item</button>
+            <label class="text-sm font-medium">Descrição</label>
+            <textarea
+              v-model.trim="form.description"
+              rows="4"
+              class="mt-1 w-full border rounded-lg px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Descreva os detalhes da ordem de serviço…"
+            />
+          </div>
+
+          <div class="rounded-xl border">
+            <div class="px-4 py-3 border-b bg-gray-50 rounded-t-xl flex items-center gap-2">
+              <span class="text-sm font-medium">Opções de Checklist</span>
             </div>
 
-            <div class="space-y-2">
-              <div v-for="(it, idx) in newChecklist.items" :key="idx" class="flex items-start gap-2">
-                <input class="w-full border rounded-md px-3 py-2" placeholder="Descrição do item" v-model="it.label" />
-                <label class="text-xs flex items-center gap-1 px-2">
-                  <input type="checkbox" v-model="it.required" />
-                  obrigatório
+            <div class="p-4 space-y-6">
+              <div class="flex flex-wrap items-center gap-6">
+                <label class="flex items-center gap-2">
+                  <input type="radio" value="existing" v-model="form.mode" />
+                  <span class="text-sm">Usar checklist existente</span>
                 </label>
-                <button class="px-2 py-1 rounded-md border text-xs" @click="removeItem(idx)" :disabled="newChecklist.items.length === 1">
-                  Remover
-                </button>
+                <label class="flex items-center gap-2">
+                  <input type="radio" value="new" v-model="form.mode" />
+                  <span class="text-sm">Criar novo checklist</span>
+                </label>
+              </div>
+
+              <div v-if="form.mode === 'existing'" class="space-y-2">
+                <label class="text-sm font-medium">Selecione o Checklist</label>
+                <select
+                  v-model="form.templateId"
+                  class="w-full border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione…</option>
+                  <option v-for="tpl in tplQuery.data?.value ?? []" :key="tpl.id" :value="tpl.id">
+                    {{ tpl.name }}
+                  </option>
+                </select>
+                <div v-if="(tplQuery.data?.value?.length ?? 0) === 0" class="text-xs text-amber-600">
+                  Nenhum template cadastrado.
+                </div>
+                <p v-if="!isValidTemplateExisting" class="text-xs text-red-600">Selecione um template.</p>
+              </div>
+
+              <div v-else class="space-y-4">
+                <div>
+                  <label class="text-sm font-medium">Nome do checklist *</label>
+                  <input
+                    v-model.trim="form.newChecklistName"
+                    placeholder="Ex.: Checklist Padrão"
+                    class="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium">Itens</label>
+                    <button type="button" class="px-3 py-1.5 rounded-md border hover:bg-gray-50" @click="addItem">
+                      + Adicionar item
+                    </button>
+                  </div>
+
+                  <div v-if="form.items.length === 0" class="text-sm text-muted-foreground">
+                    Nenhum item ainda. Clique em “Adicionar item”.
+                  </div>
+
+                  <div v-for="(it, idx) in form.items" :key="it.id" class="rounded-lg border p-3">
+                    <div class="grid gap-3 md:grid-cols-[1fr_auto]">
+                      <input
+                        v-model.trim="it.label"
+                        class="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ex.: Validar ambiente/equipamentos"
+                      />
+                      <div class="flex items-center gap-4">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                          <input type="checkbox" v-model="it.required" />
+                          Obrigatório
+                        </label>
+                        <button type="button" class="text-red-600 text-sm hover:underline" @click="removeItem(idx)">
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p v-if="!isValidTemplateNew" class="text-xs text-red-600">
+                    Dê um nome ao checklist e inclua pelo menos 1 item (sem rótulos vazios).
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="pt-2 flex gap-2">
-          <button class="px-4 py-2 rounded-md bg-black text-white" :disabled="!canSubmit || mCreate.isPending.value" @click="submit">
-            {{ mCreate.isPending.value ? 'Criando…' : 'Criar' }}
-          </button>
-          <button class="px-4 py-2 rounded-md border" @click="$router.back()">Cancelar</button>
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              class="px-3 py-2 rounded-md border"
+              @click="$router.back()"
+              :disabled="createMut.isPending.value"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              :disabled="!canSubmit || createMut.isPending.value"
+              @click="createMut.mutate()"
+            >
+              {{ createMut.isPending.value ? 'Criando…' : 'Criar OS' }}
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div v-if="tplQuery.isLoading.value" class="text-sm text-muted-foreground mt-3">Carregando templates…</div>
+      <div v-if="tplQuery.isError.value" class="text-sm text-red-600 mt-3">
+        Falha ao carregar templates.
       </div>
     </div>
   </div>

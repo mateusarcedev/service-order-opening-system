@@ -55,6 +55,10 @@ async function submit() {
             <span v-if="loading">Entrando…</span>
             <span v-else>Entrar</span>
           </Button>
+          <div class="text-sm text-muted-foreground text-center mt-2">
+            Não tem conta?
+            <RouterLink class="underline" to="/signup">Criar conta</RouterLink>
+          </div>
         </form>
       </CardContent>
     </Card>
